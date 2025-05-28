@@ -1,80 +1,105 @@
 import streamlit as st
 import pandas as pd
+import os
 
-# Relationship data
-data = [
-    {"English": "Mother", "Hindi": "माता / माँ"},
-    {"English": "Father", "Hindi": "पिता / पापा"},
-    {"English": "Son", "Hindi": "बेटा / पुत्र"},
-    {"English": "Daughter", "Hindi": "बेटी / पुत्री"},
-    {"English": "Brother", "Hindi": "भाई"},
-    {"English": "Sister", "Hindi": "बहन"},
-    {"English": "Paternal Grandfather", "Hindi": "दादा / बाबा"},
-    {"English": "Paternal Grandmother", "Hindi": "दादी"},
-    {"English": "Maternal Grandfather", "Hindi": "नाना"},
-    {"English": "Maternal Grandmother", "Hindi": "नानी"},
-    {"English": "Paternal Uncle (Father’s Brother)", "Hindi": "चाचा"},
-    {"English": "Paternal Aunt (Uncle’s Wife)", "Hindi": "चाची"},
-    {"English": "Maternal Uncle (Mother’s Brother)", "Hindi": "मामा"},
-    {"English": "Maternal Aunt (Uncle’s Wife)", "Hindi": "मामी"},
-    {"English": "Father’s Sister", "Hindi": "बुआ"},
-    {"English": "Father's Sister's Husband", "Hindi": "फूफा"},
-    {"English": "Mother's Sister", "Hindi": "मौसी"},
-    {"English": "Mother's Sister's Husband", "Hindi": "मौसा"},
-    {"English": "Father-in-law", "Hindi": "ससुर"},
-    {"English": "Mother-in-law", "Hindi": "सास"},
-    {"English": "Son-in-law", "Hindi": "दामाद"},
-    {"English": "Daughter-in-law", "Hindi": "बहू"},
-    {"English": "Brother-in-law (Wife’s Brother)", "Hindi": "साला"},
-    {"English": "Sister-in-law (Wife’s Sister)", "Hindi": "साली"},
-    {"English": "Sister-in-law (Brother’s Wife)", "Hindi": "भाभी"},
-    {"English": "Grandson (Son’s child)", "Hindi": "पोता"},
-    {"English": "Granddaughter (Son’s child)", "Hindi": "पोती"},
-    {"English": "Grandson (Daughter’s child)", "Hindi": "नाती"},
-    {"English": "Granddaughter (Daughter’s child)", "Hindi": "नातिनी"},
-    {"English": "Nephew (Brother’s Son)", "Hindi": "भतीजा"},
-    {"English": "Niece (Brother’s Daughter)", "Hindi": "भतीजी"},
-    {"English": "Nephew (Sister’s Son)", "Hindi": "भांजा / भानेज"},
-    {"English": "Niece (Sister’s Daughter)", "Hindi": "भांजी"},
-    {"English": "Step Brother", "Hindi": "सौतेला भाई"},
-    {"English": "Step Sister", "Hindi": "सौतेली बहन"},
-    {"English": "Step Father", "Hindi": "सौतेला पिता"},
-    {"English": "Step Mother", "Hindi": "सौतेली माँ"},
-    {"English": "Adopted Son", "Hindi": "गोद लिया बेटा"},
-    {"English": "Adopted Daughter", "Hindi": "गोद ली हुई बेटी"},
-    {"English": "Cousin Brother (Paternal Uncle's Son)", "Hindi": "चचेरा भाई"},
-    {"English": "Cousin Sister (Paternal Uncle's Daughter)", "Hindi": "चचेरी बहन"},
-    {"English": "Cousin Brother (Maternal Uncle's Son)", "Hindi": "ममेरा भाई"},
-    {"English": "Cousin Sister (Maternal Uncle's Daughter)", "Hindi": "ममेरी बहन"},
-    {"English": "Cousin Brother (Father's Sister's Son)", "Hindi": "फुफेरा भाई"},
-    {"English": "Cousin Sister (Father's Sister's Daughter)", "Hindi": "फुफेरी बहन"},
-    {"English": "Cousin Brother (Mother's Sister's Son)", "Hindi": "मौसेरा भाई"},
-    {"English": "Cousin Sister (Mother's Sister's Daughter)", "Hindi": "मौसेरी बहन"},
-    {"English": "Brother-in-law (Sister's Husband)", "Hindi": "बहनोई"},
-    {"English": "Wife", "Hindi": "पत्नी"},
-    {"English": "Husband of wife's sister", "Hindi": "साढ़ू भाई"},
-    {"English": "Elder brother-in-law", "Hindi": "जेठ"},
-    {"English": "Younger brother-in-law", "Hindi": "देवर"},
-    {"English": "Great-grandfather", "Hindi": "परदादा / परआजा"},
-    {"English": "Father’s elder brother", "Hindi": "ताऊ"},
-    {"English": "Father’s elder brother’s wife", "Hindi": "ताई"},
-    {"English": "Younger brother's wife", "Hindi": "नथी"},
-    {"English": "Paternal aunt’s daughter", "Hindi": "फुफैली"},
-    {"English": "Great-grandchild", "Hindi": "परआजा"},
-    {"English": "Wife of your husband's brother", "Hindi": "सरहज"},
-]
+CSV_FILE = "family_relationships.csv"
 
-# Convert to DataFrame
-df = pd.DataFrame(data)
+# Load data from CSV with caching
+@st.cache_data(show_spinner=False)
+def load_data():
+    if os.path.exists(CSV_FILE):
+        return pd.read_csv(CSV_FILE)
+    else:
+        return pd.DataFrame(columns=["English", "Hindi"])
+
+# Save data to CSV
+def save_data(df):
+    df.to_csv(CSV_FILE, index=False)
+
+# Load into session_state
+if "relation_df" not in st.session_state:
+    st.session_state.relation_df = load_data()
+
+if "undo_stack" not in st.session_state:
+    st.session_state.undo_stack = []
 
 st.title("👨‍👩‍👧‍👦 Family Relationship Finder")
 
-# Search input
-search = st.text_input("🔍 Type to search relationship (English or Hindi):")
-
-# Filter results
+# 🔍 Search
+search = st.text_input("🔍 Search relationship (English or Hindi):")
+filtered_df = st.session_state.relation_df.copy()
 if search:
-    filtered = df[df.apply(lambda row: search.lower() in row['English'].lower() or search in row['Hindi'], axis=1)]
-    st.table(filtered)
-else:
-    st.table(df)
+    filtered_df = filtered_df[
+        filtered_df.apply(
+            lambda row: search.lower() in row['English'].lower() or search.lower() in row['Hindi'].lower(),
+            axis=1,
+        )
+    ]
+
+st.table(filtered_df)
+
+st.markdown("---")
+
+# ✏️ Edit Existing Relationship
+st.subheader("✏️ Edit Existing Relationship")
+
+relation_options = ["-- Select a relationship --"] + st.session_state.relation_df['English'].tolist()
+selected_relation = st.selectbox("Select relationship to edit:", options=relation_options)
+
+if selected_relation != "-- Select a relationship --":
+    idx = st.session_state.relation_df[st.session_state.relation_df['English'] == selected_relation].index[0]
+    current = st.session_state.relation_df.loc[idx]
+
+    new_english = st.text_input("English Term", value=current["English"], key="edit_eng")
+    new_hindi = st.text_input("Hindi Term", value=current["Hindi"], key="edit_hin")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Update Relation"):
+            if new_english.strip() and new_hindi.strip():
+                st.session_state.relation_df.at[idx, 'English'] = new_english.strip()
+                st.session_state.relation_df.at[idx, 'Hindi'] = new_hindi.strip()
+                save_data(st.session_state.relation_df)
+                st.success(f"Updated: {new_english} - {new_hindi}")
+                st.rerun()
+            else:
+                st.warning("Both English and Hindi terms are required.")
+
+    with col2:
+        if st.button("Delete Relation"):
+            deleted_row = st.session_state.relation_df.loc[[idx]]
+            st.session_state.undo_stack.append(deleted_row)
+            st.session_state.relation_df = st.session_state.relation_df.drop(idx).reset_index(drop=True)
+            save_data(st.session_state.relation_df)
+            st.success(f"Deleted: {selected_relation}")
+            st.rerun()
+
+st.markdown("---")
+
+# ⏪ Undo Last Delete
+if st.session_state.undo_stack:
+    if st.button("Undo Last Delete"):
+        restored_row = st.session_state.undo_stack.pop()
+        st.session_state.relation_df = pd.concat([st.session_state.relation_df, restored_row], ignore_index=True)
+        save_data(st.session_state.relation_df)
+        st.success(f"Restored: {restored_row.iloc[0]['English']}")
+        st.rerun()
+
+st.markdown("---")
+
+# ➕ Add New Relationship
+st.subheader("+ Add New Relationship")
+with st.form("add_form"):
+    english_term = st.text_input("English Term", key="add_eng")
+    hindi_term = st.text_input("Hindi Term", key="add_hin")
+    submitted = st.form_submit_button("Add")
+
+    if submitted:
+        if english_term.strip() and hindi_term.strip():
+            new_row = pd.DataFrame([{"English": english_term.strip(), "Hindi": hindi_term.strip()}])
+            st.session_state.relation_df = pd.concat([st.session_state.relation_df, new_row], ignore_index=True)
+            save_data(st.session_state.relation_df)
+            st.success(f"Added: {english_term} - {hindi_term}")
+            st.rerun()
+        else:
+            st.warning("Please provide both English and Hindi terms.")
