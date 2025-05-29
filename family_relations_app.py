@@ -5,7 +5,7 @@ import os
 st.title("👨‍👩‍👧‍👦 Family Relationship Finder")
 
 # 📁 CSV file path
-CSV_FILE = r"C:\Users\13900\Downloads\llm_project\family_relationships.csv"
+CSV_FILE = "family_relations.csv"
 os.makedirs(os.path.dirname(CSV_FILE), exist_ok=True)
 
 # 🔄 Load data from CSV (no cache)
