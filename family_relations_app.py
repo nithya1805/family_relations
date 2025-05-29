@@ -138,3 +138,5 @@ with st.form("add_form"):
             st.rerun()
         else:
             st.warning("⚠️ Please provide both English and Hindi terms.")
+
+
